@@ -21,16 +21,23 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 load_dotenv()
+# This must be obtained from Google Cloud Console. Please see readme.md for more details.
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
-logger.info(f"GOOGLE_CLIENT_ID: {GOOGLE_CLIENT_ID}")
-logger.info(f"GOOGLE_CLIENT_SECRET: {GOOGLE_CLIENT_SECRET}")
+
 
 BASE_URL = os.getenv("BASE_URL", "http://localhost:8000")
 REDIRECT_PATH = os.getenv("REDIRECT_PATH", "/auth/callback")
 REQUIRED_SCOPES = os.getenv("REQUIRED_SCOPES", ["openid", "https://www.googleapis.com/auth/userinfo.email", "https://www.googleapis.com/auth/userinfo.profile"])
-# Allow client callback servers on ANY localhost port (client uses random ports)
-ALLOWED_CLIENT_REDIRECT_URIS = os.getenv("ALLOWED_CLIENT_REDIRECT_URIS", ["http://localhost:*", "http://127.0.0.1:*"])
+# Allow client callback servers on ANY localhost port (client uses random ports) This is not secure.
+# ALLOWED_CLIENT_REDIRECT_URIS = os.getenv("ALLOWED_CLIENT_REDIRECT_URIS", ["http://localhost:*", "http://127.0.0.1:*"])
+
+# A better way to allow client callback servers is to use port-less loopback URIs.
+# OAuth 2.0 providers (including Google) support port-less loopback URIs
+# When you register http://127.0.0.1 in Google Cloud Console, Google automatically accepts any port on that interface
+# This is more secure than wildcards because it's limited to loopback only
+ALLOWED_CLIENT_REDIRECT_URIS = os.getenv("ALLOWED_CLIENT_REDIRECT_URIS", ["http://localhost", "http://127.0.0.1"])
+
 MCP_PATH = os.getenv("MCP_PATH", "/mcp")
 
 # Google authentication provider
@@ -62,10 +69,12 @@ def get_weather(city: str):
 @mcp.custom_route("/healthz", methods=["GET"])
 async def healthz(request: Request) -> JSONResponse:
     return JSONResponse(
-        {
-            "status": "ok",
-            "base_url": BASE_URL,
-            "mcp_path": "/mcp",
+        {"status": "ok", "base_url": BASE_URL, "mcp_path": "/mcp"},
+        headers={
+            "X-Content-Type-Options": "nosniff", # Prevent MIME type sniffing
+            "X-Frame-Options": "DENY", # Prevent clickjacking attacks
+            "Content-Security-Policy": "default-src 'none'", # Prevent content injection attacks
+            "Cache-Control": "no-store, max-age=0", # Prevent caching of sensitive data
         }
     )
 
@@ -82,5 +91,8 @@ if __name__ == "__main__":
 
     # Use "http" transport (recommended for OAuth flows)
     # Note: All FastMCP OAuth examples use "http", not "streamable-http"
-    mcp.run(transport="http", host="0.0.0.0", port=8000, path=MCP_PATH)
+    # mcp.run(transport="http", host="0.0.0.0", port=8000, path=MCP_PATH)
+    # Set host to 127.0.0.1 than 0.0.0.0 for local development.
+    # Setting it to 0.0.0.0 will allow the server to be accessed from any IP address, which is not secure.
+    mcp.run(transport="streamable-http", host="127.0.0.1", port=8000, path=MCP_PATH)
     logger.info(f"Starting MCP server on {BASE_URL}{MCP_PATH}")

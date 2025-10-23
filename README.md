@@ -58,7 +58,11 @@ Before you can run the MCP Server successfully with Google OAuth Provider, follo
      - User support email
      - Developer contact information
    - Click **Save and Continue**
-   - Add scopes if needed (optional for basic setup)
+   - Add scopes if needed (These scopes are set in the MCP Client)
+     - Select these scopes 
+       - openid 
+       - https://www.googleapis.com/auth/userinfo.email 
+       - https://www.googleapis.com/auth/userinfo.profile
    - Add test users if desired (optional)
    - Complete the consent screen setup
 
